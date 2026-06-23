@@ -1,102 +1,96 @@
-# BadmintonSphere 🏸
+# Cat Breed Classifier
 
-A cross-platform badminton court booking app built with **Flutter** and powered by **Supabase**. Users can browse courts, register an account, book time slots (with optional add-ons), and manage their bookings. Admins get a dashboard to manage users and view all bookings.
+A deep-learning project that classifies cat images into 11 breeds using transfer
+learning. Three pretrained convolutional backbones — **ResNet50**,
+**DenseNet121**, and **MobileNetV3Large** — are fine-tuned and compared on
+accuracy, mean average precision (mAP), and training time.
 
-## Features
+The entire workflow lives in [`ProjectAI/ProjectAI.ipynb`](ProjectAI/ProjectAI.ipynb):
+dataset collection, train/val/test splitting, model training, evaluation, and
+visualization.
 
-### For Users
-- Browse available courts with photos, pricing (RM/hour), capacity, and facilities
-- Register and log in
-- Book a court by date, start/end time, and duration
-- Add optional extras (add-ons) to a booking
-- View, edit, and cancel personal bookings
-- Manage profile details
+## Breeds
 
-### For Admins
-- Separate admin login (role-based)
-- Admin dashboard listing all users and their bookings
-- Edit and delete users
+The model recognizes 11 classes:
 
-## Tech Stack
+| | | |
+|---|---|---|
+| Abyssinian | Bengal | British Shorthair |
+| Maine Coon | Norwegian Forest | Persian |
+| Ragdoll | Russian Blue | Scottish Fold |
+| Siamese | Sphynx | |
 
-| Layer        | Technology |
-|--------------|------------|
-| Frontend     | Flutter (Dart `^3.8.1`), Material Design |
-| Backend / DB | [Supabase](https://supabase.com) (PostgreSQL + REST) |
-| Config       | `flutter_dotenv` for environment variables |
-| Local cache  | `sqflite` |
+## Pipeline
 
-Key packages: `supabase_flutter`, `flutter_dotenv`, `sqflite`, `path`, `cupertino_icons`.
+1. **Data collection** — A Selenium script scrapes ~330 images per breed from
+   Bing Images, with hashing to skip duplicates and resume support to avoid
+   re-downloading.
+2. **Splitting** — Images are shuffled and split per class into
+   70% train / 15% validation / 15% test.
+3. **Modeling** — Each backbone is loaded with ImageNet weights, frozen, and
+   topped with a `GlobalAveragePooling2D` + `Dense(softmax)` head
+   (`build_model` in the notebook).
+4. **Training** — Models are compiled with Adam (`lr=1e-4`) and categorical
+   cross-entropy, then trained for 50 epochs.
+5. **Evaluation** — Accuracy, mAP, accuracy/loss curves, confusion matrices,
+   and a side-by-side model comparison.
 
-## Project Structure
+Dataset sizes used during training: **1931** train, **408** validation,
+**426** test images.
+
+## Project structure
 
 ```
 .
-├── backend/                  # Supabase service-role config (.env only)
-└── eventsphere/              # Flutter application
-    ├── lib/
-    │   ├── main.dart                 # App entry point + Supabase init
-    │   ├── database/
-    │   │   └── supabase_service.dart # All Supabase queries (users, courts, addons, bookings)
-    │   ├── models/                   # Data models: User, Admin, Court, Addon, Booking
-    │   └── screens/                  # UI screens (home, login, register, booking, dashboards, profile…)
-    └── assets/                       # Court images
+├── ProjectAI/
+│   ├── ProjectAI.ipynb              # Full pipeline notebook
+│   ├── cat_images/                  # Dataset (gitignored)
+│   │   ├── <breed>/                 # Raw downloaded images per breed
+│   │   ├── train/ val/ test/        # Split datasets
+│   ├── model_resnet50.h5            # Trained ResNet50
+│   ├── model_densenet121.h5         # Trained DenseNet121
+│   └── model_mobilenetv3large.h5    # Trained MobileNetV3Large
+├── ProjectAI.html                   # Rendered/exported notebook
+└── README.md
 ```
 
-## Data Model
+> **Note:** The `cat_images/` dataset folder and `*.h5` model files are excluded
+> from version control via `.gitignore` due to their size.
 
-The app expects the following Supabase (PostgreSQL) tables:
+## Requirements
 
-- **users** — `id`, `full_name`, `email`, `phone`, `username`, `password`, `role` (`user` | `admin`)
-- **courts** — `id`, `court_name`, `court_type`, `price_per_hour`, `capacity`, `facilities`
-- **addons** — `id`, `addon_name`, `description`, `price`
-- **bookings** — `id`, `user_id`, `court_id`, `booking_date`, `start_time`, `end_time`, `duration_hours`, `base_price`, `addons_total`, `total_amount`, `status`, `booked_at`
-- **booking_addons** — join table linking `booking_id` ↔ `addon_id`
+```bash
+pip install tensorflow scikit-learn numpy pandas matplotlib selenium requests
+```
 
-> ⚠️ **Security note:** This project stores and compares passwords as plain text and authenticates against the `users` table directly. This is fine for a learning/demo project, but do **not** use this approach in production. Use Supabase Auth and hashed passwords instead.
+The data-collection cells additionally require Google Chrome and a matching
+[ChromeDriver](https://chromedriver.chromium.org/) on your `PATH`.
 
-## Getting Started
+## Usage
 
-### Prerequisites
-- [Flutter SDK](https://docs.flutter.dev/get-started/install) (Dart `^3.8.1`)
-- A [Supabase](https://supabase.com) project with the tables above
+1. Open the notebook:
 
-### Setup
-
-1. **Clone the repo**
    ```bash
-   git clone <repo-url>
-   cd Eventbooking-app-main/eventsphere
+   jupyter notebook ProjectAI/ProjectAI.ipynb
    ```
 
-2. **Create the `.env` file** in `eventsphere/`:
-   ```env
-   SUPABASE_URL=https://your-project.supabase.co
-   SUPABASE_ANON_KEY=your-anon-key
-   ```
+2. (Optional) Run the scraping cells to build `cat_images/`, or supply your own
+   images organized as `cat_images/<breed>/`.
+3. Run the splitting cell to generate `train/`, `val/`, and `test/` folders.
+4. Run the training cells to fit the three models and save the `.h5` files.
+5. Run the evaluation cells to produce accuracy/mAP scores, comparison charts,
+   and confusion matrices.
 
-   The `backend/.env` holds the service-role key (server-side only — never ship this in the app):
-   ```env
-   SUPABASE_URL=https://your-project.supabase.co
-   SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-   ```
+> **Path note:** Several cells contain hard-coded absolute Windows paths
+> (e.g. `C:\Users\...\ProjectAI\cat_images`). Update these to match your own
+> environment before running.
 
-3. **Install dependencies**
-   ```bash
-   flutter pub get
-   ```
+## Results
 
-4. **Run the app**
-   ```bash
-   flutter run
-   ```
-
-## Configuration Notes
-
-- The `.env` file is registered as a Flutter asset in `pubspec.yaml`, so it is bundled into the app at build time.
-- Court images in `assets/` are matched to courts by name (e.g. "Court A" → `assets/courtA.jpg`). Courts without a matching image fall back to a default gradient placeholder.
-- Prices are displayed in Malaysian Ringgit (RM).
-
-## License
-
-This project is provided as-is for educational purposes.
+DenseNet121 was the strongest performer. Its densely connected architecture
+promotes feature reuse and efficient gradient flow, letting it learn well even
+with only simple rescaling and no heavy augmentation. ResNet50 trailed with
+higher training/validation loss, while MobileNetV3Large — optimized for
+lightweight, mobile inference — trained fastest but was less able to separate
+visually similar breeds. See the comparison and confusion-matrix cells at the
+end of the notebook for exact figures.
