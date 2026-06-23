@@ -1,0 +1,15 @@
+# Dataset (large image folder)
+cat_images/
+
+# Trained model files
+*.h5
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# Markdown files (excluded per project preference)
+*.md
+
+# Python cache
+__pycache__/
+*.pyc
